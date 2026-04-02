@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anatomie maďarského bohatství — NER a Top 100</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+  /* === VÝCHOZÍ TÉMA: SVĚTLÉ === */
+  :root,
+  [data-theme="light"] {
+    --bg: #f5f3ef;
+    --bg2: #eceae5;
+    --bg3: #e2e0da;
+    --border: #ccc9c0;
+    --text: #1a1814;
+    --muted: #6a6460;
+    --bar-neutral: #a09888;
+    --bar-hist: #908878;
+    --accent: #a02820; --accent2: #2a5a1a; --accent3: #907010; --green: #3a7e4f; --blue: #1a5080; --ner: #a02820; --indep: #3a7e4f; --partial: #907010; --red: #a02020;
+    --toggle-bg: #ddd9d0;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0d0d0d;
+    --bg2: #161616;
+    --bg3: #1e1e1e;
+    --border: #2a2a2a;
+    --text: #e8e2d9;
+    --muted: #6b6560;
+    --bar-neutral: #3a3a3a;
+    --bar-hist: #4a4a4a;
+    --accent: #c44b3e; --accent2: #4a7a3a; --accent3: #b8942a; --green: #5a9e6f; --blue: #3a70a0; --ner: #c44b3e; --indep: #5a9e6f; --partial: #b8942a; --red: #c94040;
+    --toggle-bg: #2a2a2a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 300;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 4rem 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute; top: -60px; right: -60px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(196,75,62,0.07) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .header-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.2em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 1rem;
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.2rem, 5vw, 4rem);
+    font-weight: 900; line-height: 1.1; margin-bottom: 0.8rem;
+  }
+  h1 em { font-style: italic; color: var(--accent); }
+  .header-sub { font-size: 0.95rem; color: var(--muted); max-width: 640px; }
+  .header-meta {
+    display: flex; gap: 2rem; margin-top: 1.5rem;
+    font-family: 'DM Mono', monospace; font-size: 0.72rem;
+    color: var(--muted); flex-wrap: wrap;
+  }
+  .header-meta span { border-left: 2px solid var(--border); padding-left: 0.8rem; }
+
+  nav {
+    border-bottom: 1px solid var(--border);
+    padding: 0 4rem; display: flex; gap: 0; overflow-x: auto;
+  }
+  nav button {
+    background: none; border: none; cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 0.72rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); padding: 1rem 1.5rem;
+    border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap;
+  }
+  nav button:hover { color: var(--text); }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .section { display: none; padding: 3rem 4rem; }
+  .section.active { display: block; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: var(--border); margin-bottom: 3rem; }
+  .stat-card { background: var(--bg2); padding: 1.8rem; position: relative; overflow: hidden; }
+  .stat-card::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent); opacity: 0; transition: opacity 0.3s;
+  }
+  .stat-card:hover::after { opacity: 1; }
+  .stat-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; margin-bottom: 0.5rem; }
+  .stat-value { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: var(--accent); }
+  .stat-note { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  thead { border-bottom: 1px solid var(--border); }
+  th {
+    font-family: 'DM Mono', monospace; font-size: 0.63rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); padding: 0.8rem 0.7rem; text-align: left;
+  }
+  td { padding: 0.8rem 0.7rem; border-bottom: 1px solid rgba(42,42,42,0.5); vertical-align: top; }
+  tr:hover td { background: var(--bg3); }
+  .rank { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); width: 36px; }
+  .name { font-weight: 500; }
+  .wealth { font-family: 'DM Mono', monospace; color: var(--accent3); text-align: right; }
+
+  .sector-tag {
+    display: inline-block; font-size: 0.62rem; padding: 0.1rem 0.4rem;
+    border-radius: 2px; font-family: 'DM Mono', monospace;
+    letter-spacing: 0.04em; margin-right: 0.25rem; margin-bottom: 0.2rem;
+    background: rgba(196,75,62,0.1); color: var(--accent);
+    border: 1px solid rgba(196,75,62,0.2);
+  }
+  .sector-tag.energy { background: rgba(184,148,42,0.1); color: var(--accent3); border-color: rgba(184,148,42,0.2); }
+  .sector-tag.bank { background: rgba(74,122,58,0.1); color: var(--accent2); border-color: rgba(74,122,58,0.2); }
+  .sector-tag.realestate { background: rgba(58,112,160,0.1); color: var(--blue); border-color: rgba(58,112,160,0.2); }
+  .sector-tag.tech { background: rgba(90,158,111,0.1); color: var(--green); border-color: rgba(90,158,111,0.2); }
+  .sector-tag.media { background: rgba(180,80,160,0.1); color: #d060b0; border-color: rgba(180,80,160,0.2); }
+  .sector-tag.industry { background: rgba(140,110,70,0.1); color: #c09060; border-color: rgba(140,110,70,0.2); }
+  .sector-tag.agri { background: rgba(100,150,60,0.1); color: #80c040; border-color: rgba(100,150,60,0.2); }
+  .sector-tag.telecom { background: rgba(60,100,170,0.1); color: #80b0e0; border-color: rgba(60,100,170,0.2); }
+
+  /* NER vs. nezávislý badge */
+  .ner-badge {
+    display: inline-block; font-size: 0.6rem; padding: 0.1rem 0.45rem;
+    border-radius: 2px; font-family: 'DM Mono', monospace; font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+  .ner-badge.ner { background: rgba(196,75,62,0.2); color: var(--ner); border: 1px solid rgba(196,75,62,0.4); }
+  .ner-badge.indep { background: rgba(90,158,111,0.2); color: var(--indep); border: 1px solid rgba(90,158,111,0.4); }
+  .ner-badge.partial { background: rgba(184,148,42,0.2); color: var(--accent3); border: 1px solid rgba(184,148,42,0.4); }
+
+  .chart-section { margin-bottom: 3rem; }
+  .chart-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; margin-bottom: 0.4rem; }
+  .chart-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.5rem; }
+
+  .bar-chart { display: flex; flex-direction: column; gap: 0.6rem; }
+  .bar-row { display: flex; align-items: center; gap: 1rem; }
+  .bar-label { font-size: 0.78rem; width: 170px; flex-shrink: 0; color: var(--text); }
+  .bar-track { flex: 1; background: var(--bg3); height: 28px; position: relative; overflow: hidden; }
+  .bar-fill {
+    height: 100%; position: absolute; left: 0; top: 0;
+    display: flex; align-items: center; padding-left: 0.5rem;
+    font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--bg);
+  }
+  .bar-value { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); width: 100px; text-align: right; }
+
+  .c-ner    { background: linear-gradient(90deg, #903030, #c04040); }
+  .c-indep  { background: linear-gradient(90deg, #305030, #508050); }
+  .c-bank   { background: linear-gradient(90deg, #305020, #507040); }
+  .c-realestate { background: linear-gradient(90deg, #204060, #3060a0); }
+  .c-tech   { background: linear-gradient(90deg, #204040, #306060); }
+  .c-energy { background: linear-gradient(90deg, #806020, #a08030); }
+  .c-telecom{ background: linear-gradient(90deg, #203060, #3050a0); }
+  .c-media  { background: linear-gradient(90deg, #802060, #b04080); }
+
+  .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1px; background: var(--border); }
+  .profile-card { background: var(--bg2); padding: 1.8rem; position: relative; overflow: hidden; }
+  .card-rank { font-family: 'Playfair Display', serif; font-size: 3rem; font-weight: 900; color: var(--border); position: absolute; right: 1rem; top: 0.5rem; line-height: 1; }
+  .card-name { font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .card-wealth { font-family: 'DM Mono', monospace; font-size: 0.85rem; color: var(--accent3); margin-bottom: 0.8rem; }
+  .card-group { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.6rem; }
+  .card-desc { font-size: 0.82rem; line-height: 1.5; color: var(--text); margin-bottom: 1rem; }
+  .card-origin { font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 0.8rem; }
+  .card-origin strong { color: var(--text); }
+
+  .pol-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1px; background: var(--border); }
+  .pol-card { background: var(--bg2); padding: 1.5rem; border-left: 3px solid transparent; }
+  .pol-card.ner-direct { border-left-color: #c42020; }
+  .pol-card.ner-indirect { border-left-color: var(--ner); }
+  .pol-card.partial { border-left-color: var(--accent3); }
+  .pol-card.indep { border-left-color: var(--indep); }
+  .pol-name { font-weight: 500; margin-bottom: 0.3rem; }
+  .pol-level { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.6rem; }
+  .pol-level.ner-direct { color: #c42020; }
+  .pol-level.ner-indirect { color: var(--ner); }
+  .pol-level.partial { color: var(--accent3); }
+  .pol-level.indep { color: var(--indep); }
+  .pol-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+
+  .filter-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .filter-btn {
+    background: var(--bg3); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; padding: 0.3rem 0.8rem;
+    font-family: 'DM Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.1em; text-transform: uppercase; transition: all 0.2s;
+  }
+  .filter-btn:hover, .filter-btn.active { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 500; }
+
+  .method-note { background: var(--bg3); border: 1px solid var(--border); padding: 1.2rem 1.5rem; margin-top: 2rem; font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+  .method-note strong { color: var(--text); }
+
+  /* NER-box vysvětlení */
+  .ner-explainer {
+    background: rgba(196,75,62,0.05); border: 1px solid rgba(196,75,62,0.2);
+    padding: 1.5rem; margin-bottom: 2rem;
+    font-size: 0.85rem; line-height: 1.6;
+  }
+  .ner-explainer h3 { font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.15em; color: var(--accent); text-transform: uppercase; margin-bottom: 0.6rem; }
+
+  @media (max-width: 768px) {
+    header, .section { padding: 1.5rem; }
+    nav { padding: 0 1rem; }
+    .bar-label { width: 120px; font-size: 0.72rem; }
+  }
+
+  /* === THEME TOGGLE === */
+  #theme-toggle {
+    position: fixed;
+    top: 1.2rem;
+    right: 1.5rem;
+    z-index: 999;
+    background: var(--toggle-bg, #2a2a2a);
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    padding: 0.4rem 0.9rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: background 0.2s, color 0.2s;
+    letter-spacing: 0.03em;
+  }
+  #theme-toggle:hover { color: var(--text); }
+  #theme-toggle .toggle-sun  { display: none; }
+  #theme-toggle .toggle-moon { display: inline; }
+  [data-theme="dark"] #theme-toggle .toggle-sun  { display: inline; }
+  [data-theme="dark"] #theme-toggle .toggle-moon { display: none; }
+
+  
+  /* === LIGHT MODE DOPLŇKY === */
+  [data-theme="light"] header::before {
+    opacity: 0.08;
+  }
+  [data-theme="light"] .bar-fill {
+    filter: brightness(0.85);
+  }
+  [data-theme="light"] nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+  [data-theme="light"] nav button {
+    color: var(--muted);
+  }
+  [data-theme="light"] nav button.active,
+  [data-theme="light"] nav button:hover {
+    color: var(--accent);
+  }
+  [data-theme="light"] .profile-card,
+  [data-theme="light"] .pol-card {
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  [data-theme="light"] tr:hover {
+    background: var(--bg3);
+  }
+
+  </style>
+</head>
+<body data-theme="light">
+<button id="theme-toggle" aria-label="Přepnout téma" title="Přepnout světlé / tmavé">
+  <span class="toggle-moon">🌙 Tmavé</span>
+  <span class="toggle-sun">☀️ Světlé</span>
+</button>
+
+
+<header>
+  <div class="header-eyebrow">Analýza · Forbes HU 2025 · Maďarská republika</div>
+  <h1>Anatomie<br><em>maďarského bohatství</em></h1>
+  <p class="header-sub">Žebříček, struktura, dynamika a politické vazby 100 nejbohatších Maďarů — s důrazem na systém NER (Národní systém spolupráce) a bezprecedentní propojení státní moci a soukromého bohatství.</p>
+  <div class="header-meta">
+    <span>Zdroj: Forbes HU 2025 (říjen), 100 leggazdagabb magyar 2025 (květen)</span>
+    <span>Hodnoty v mld. HUF + přepočet Kč</span>
+    <span>Kurz 2025: 100 HUF = 6,22 Kč (průměr ČNB/exchange-rates.org) | 2024: 6,36 Kč | 2023: 6,29 Kč | 2022: 6,59 Kč</span>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('prehled', event)">Přehled</button>
+  <button onclick="showTab('zebricek', event)">Žebříček Top 20</button>
+  <button onclick="showTab('ner', event)">Systém NER</button>
+  <button onclick="showTab('vyvoj', event)">Vývoj &amp; původ</button>
+  <button onclick="showTab('politika', event)">Politické vazby</button>
+  <button onclick="showTab('media', event)">Mediální moc</button>
+  <button onclick="showTab('koncentrace', event)">Koncentrace bohatství</button>
+</nav>
+
+<!-- ═══════════════ PŘEHLED ═══════════════ -->
+<div id="prehled" class="section active">
+
+  <div class="ner-explainer">
+    <h3>⚠ Klíčový kontext: co je NER?</h3>
+    Maďarsko je v kontextu V4 <strong>výjimečný případ</strong>. NER (Nemzeti Együttműködés Rendszere — Národní systém spolupráce) je termín pro Orbánův politicko-ekonomický systém budovaný od 2010, kde státní zakázky, regulace, média a privatizace jsou systematicky využívány k vytváření loajální podnikatelské třídy. Výsledkem je, že <strong>přibližně polovina z Top 20 nejbohatších Maďarů má přímé nebo nepřímé vazby na vládu</strong> — jejich bohatství přitom výrazně rostlo právě v dobách, kdy vláda přijímala regulace a zadávala zakázky. Tento jev nemá v ČR ani SK takto systémový charakter.
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Celkové jmění Top 50 (Forbes HU 2025)</div>
+      <div class="stat-value">9 100 mld. HUF</div>
+      <div class="stat-note">≈ 560 mld. Kč (kurz 6,22) · 2× výdaje na zdravotnictví</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Celkové jmění Top 100</div>
+      <div class="stat-value">11 020 mld. HUF</div>
+      <div class="stat-note">= 685 mld. Kč (kurz 6,22) · meziročně +22 % (+124 mld. Kč)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">#1 Mészáros Lőrinc</div>
+      <div class="stat-value">1 749,1 mld. HUF</div>
+      <div class="stat-note">= 108,8 mld. Kč (kurz 6,22) · 3× vede žebříček v řadě</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Odhadovaný podíl NER-elit</div>
+      <div class="stat-value">~40–50 %</div>
+      <div class="stat-note">z Top 20 jmění přichází z NER-vazeb — ilustrativní odhad dle Direkt36 / Átlátszó; přesná kvantifikace není možná, číslo nelze ověřit</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Minimální jmění pro Top 100</div>
+      <div class="stat-value">19,7 mld. HUF</div>
+      <div class="stat-note">= 1,23 mld. Kč (kurz 6,22) · v roce 2023: 14,5 mld. HUF = 0,91 mld. Kč</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">HDP Maďarska (2024)</div>
+      <div class="stat-value">81 448 mld. HUF</div>
+      <div class="stat-note">≈ 5 180 mld. Kč (KSH 2024) · Top 100 vlastní ~13,5 % ročního HDP</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-title">Top 15 — srovnání jmění (Forbes HU říjen 2025)</div>
+    <div class="chart-sub">Hodnoty v mld. HUF · <span style="color:var(--ner)">■ NER-spojení</span> · <span style="color:var(--indep)">■ Nezávislí</span></div>
+    <div class="bar-chart">
+      <div class="bar-row">
+        <div class="bar-label">#1 Mészáros Lőrinc</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:100%">1 749 mld. HUF = 108,8 mld. Kč</div></div>
+        <div class="bar-value">108,8 mld. Kč</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#2 Veres Tibor</div>
+        <div class="bar-track"><div class="bar-fill c-indep" style="width:43%">756,4 mld. HUF = 47,0 mld. Kč</div></div>
+        <div class="bar-value">47,0 mld. Kč</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#3 Csányi Sándor</div>
+        <div class="bar-track"><div class="bar-fill c-bank" style="width:43%">752,9 mld. HUF = 46,8 mld. Kč</div></div>
+        <div class="bar-value">46,8 mld. Kč</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#4 Felcsuti Zsolt</div>
+        <div class="bar-track"><div class="bar-fill c-indep" style="width:30%">32,6 mld. Kč</div></div>
+        <div class="bar-value">32,6 mld. Kč · 524 mld. HUF</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#5 Szíjj László</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:24%">25,9 mld. Kč</div></div>
+        <div class="bar-value">25,9 mld. Kč · 416 mld. HUF</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#6 Gattyán György</div>
+        <div class="bar-track"><div class="bar-fill c-tech" style="width:20%">21,9 mld. Kč</div></div>
+        <div class="bar-value">21,9 mld. Kč · 352 mld. HUF</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#7 Jellinek Dániel</div>
+        <div class="bar-track"><div class="bar-fill c-realestate" style="width:18%">19,5 mld. Kč</div></div>
+        <div class="bar-value">19,5 mld. Kč · 313 mld. HUF</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#8 Pavelka Tibor</div>
+        <div class="bar-track"><div class="bar-fill c-tech" style="width:18%">19,3 mld. Kč</div></div>
+        <div class="bar-value">19,3 mld. Kč · 310 mld. HUF</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#9 Jászai Gellért</div>
+        <div class="bar-track"><div class="bar-fill c-telecom" style="width:18%">19,2 mld. Kč</div></div>
+        <div class="bar-value">19,2 mld. Kč · 309 mld. HUF</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#10 Széles Gábor</div>
+        <div class="bar-track"><div class="bar-fill c-media" style="width:17%">18,7 mld. Kč</div></div>
+        <div class="bar-value">18,7 mld. Kč · 300 mld. HUF</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#11 Garancsi István</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:17%">18,4 mld. Kč</div></div>
+        <div class="bar-value">18,4 mld. Kč · 296 mld. HUF</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">#13 Tiborcz István</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:12%">13,1 mld. Kč</div></div>
+        <div class="bar-value">13,1 mld. Kč · 211 mld. HUF</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-title">Maďarsko vs. Česko vs. Slovensko</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1px;background:var(--border)">
+      <div style="background:var(--bg2);padding:1.5rem">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--accent);letter-spacing:0.1em;margin-bottom:0.5rem">🇭🇺 MAĎARSKO — Top 100</div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--accent)">11 020 mld. HUF</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.3rem">= 685 mld. Kč ≈ 27,6 mld. EUR · ~13,5 % HDP</div>
+      </div>
+      <div style="background:var(--bg2);padding:1.5rem">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--accent3);letter-spacing:0.1em;margin-bottom:0.5rem">🇨🇿 ČESKO — Top 100</div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--accent3)">~116 mld. EUR</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.3rem">≈ 36 % HDP · 3× větší než MG absolutně</div>
+      </div>
+      <div style="background:var(--bg2);padding:1.5rem">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--blue);letter-spacing:0.1em;margin-bottom:0.5rem">🇸🇰 SLOVENSKO — Top 60</div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--blue)">592 mld. Kč</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.3rem">24 mld. EUR (kurz 24,69) · ~18 % HDP SK</div>
+      </div>
+      <div style="background:var(--bg2);padding:1.5rem;border:1px solid rgba(196,75,62,0.3)">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--ner);letter-spacing:0.1em;margin-bottom:0.5rem">🏛️ NER FAKTOR — UNIKUM</div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--ner)">Systémový</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.3rem">MG: jediná země V4, kde je systémové propojení státních zakázek a soukromého bohatství takto doloženo (FT analýza 350 000 zakázek)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ŽEBŘÍČEK ═══════════════ -->
+<div id="zebricek" class="section">
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="filterTable('all', this)">Vše</button>
+    <button class="filter-btn" onclick="filterTable('ner', this)">NER-elita</button>
+    <button class="filter-btn" onclick="filterTable('indep', this)">Nezávislí</button>
+    <button class="filter-btn" onclick="filterTable('bank', this)">Bankovnictví</button>
+    <button class="filter-btn" onclick="filterTable('realestate', this)">Reality</button>
+    <button class="filter-btn" onclick="filterTable('tech', this)">Tech</button>
+    <button class="filter-btn" onclick="filterTable('industry', this)">Průmysl</button>
+  </div>
+  <div class="table-wrap">
+  <table id="rankTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Jméno</th>
+        <th>Hlavní holding / firma</th>
+        <th>Obor</th>
+        <th style="text-align:right">Jmění<br><span style="font-weight:300">(mld. HUF)</span></th>
+        <th>Mediální aktiva</th>
+        <th>NER-status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr data-sector="ner">
+        <td class="rank">1</td>
+        <td class="name">Mészáros Lőrinc</td>
+        <td>Opus Global (burza), MBH Bank, 400+ firem — stavebnictví, energie, zemědělství, turismus</td>
+        <td><span class="sector-tag">Konglomerát</span><span class="sector-tag energy">Energie</span><span class="sector-tag agri">Agro</span></td>
+        <td class="wealth">1 749 mld. HUF<br><small style="color:var(--muted)">108,8 mld. Kč</small></td>
+        <td style="font-size:0.78rem"><span class="sector-tag media">TV2</span><span class="sector-tag media">Pesti TV</span><span class="sector-tag media">Rádió 1</span><br><span style="color:var(--muted);font-size:0.7rem">+ KESMA napojení</span></td>
+        <td><span class="ner-badge ner">NER přímý</span></td>
+      </tr>
+      <tr data-sector="indep">
+        <td class="rank">2</td>
+        <td class="name">Veres Tibor</td>
+        <td>Wallis Csoport (průmysl, finance), Dayton Invest, Praktiker</td>
+        <td><span class="sector-tag industry">Průmysl/Inv.</span><span class="sector-tag realestate">Reality</span></td>
+        <td class="wealth">756 mld. HUF<br><small style="color:var(--muted)">47,0 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge indep">Nezávislý</span></td>
+      </tr>
+      <tr data-sector="bank">
+        <td class="rank">3</td>
+        <td class="name">Csányi Sándor</td>
+        <td>OTP Bank (největší v MG, expanze do EU), Bonafarm agro, MLSZ (fotbal)</td>
+        <td><span class="sector-tag bank">Banka</span><span class="sector-tag agri">Agro</span></td>
+        <td class="wealth">753 mld. HUF<br><small style="color:var(--muted)">46,8 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge partial">Fellow traveller NER</span></td>
+      </tr>
+      <tr data-sector="indep">
+        <td class="rank">4</td>
+        <td class="name">Felcsuti Zsolt</td>
+        <td>MPF Holding — průmyslové výroby, globální export, bez státních zakázek</td>
+        <td><span class="sector-tag industry">Průmysl (export)</span></td>
+        <td class="wealth">524 mld. HUF<br><small style="color:var(--muted)">32,6 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge indep">100 % nezávislý</span></td>
+      </tr>
+      <tr data-sector="ner">
+        <td class="rank">5</td>
+        <td class="name">Szíjj László</td>
+        <td>MCM Épitő, Duna Aszfalt — stavebnictví, veřejné zakázky, jachty</td>
+        <td><span class="sector-tag">Stavebnictví</span></td>
+        <td class="wealth">416 mld. HUF<br><small style="color:var(--muted)">25,9 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge ner">NER přímý</span></td>
+      </tr>
+      <tr data-sector="tech">
+        <td class="rank">6</td>
+        <td class="name">Gattyán György</td>
+        <td>Docler Holding (Jasmin Live/adult) — tech, entertainment, Malta</td>
+        <td><span class="sector-tag tech">Tech/Adult</span></td>
+        <td class="wealth">352 mld. HUF<br><small style="color:var(--muted)">21,9 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge indep">Nezávislý</span></td>
+      </tr>
+      <tr data-sector="realestate">
+        <td class="rank">7</td>
+        <td class="name">Jellinek Dániel</td>
+        <td>Indotek Group — komerční reality, nákupní centra, hotely</td>
+        <td><span class="sector-tag realestate">Reality</span></td>
+        <td class="wealth">313 mld. HUF<br><small style="color:var(--muted)">19,5 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge partial">Napojení na NER</span></td>
+      </tr>
+      <tr data-sector="tech">
+        <td class="rank">8</td>
+        <td class="name">Pavelka Tibor</td>
+        <td>Semilab — měřicí přístroje pro solární/półvodi­čový průmysl, globální</td>
+        <td><span class="sector-tag tech">MedTech/Solár</span></td>
+        <td class="wealth">310 mld. HUF<br><small style="color:var(--muted)">19,3 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge indep">100 % nezávislý</span></td>
+      </tr>
+      <tr data-sector="ner">
+        <td class="rank">9</td>
+        <td class="name">Jászai Gellért</td>
+        <td>4iG — telekomunikace, IT, kosmický průmysl, státní zakázky</td>
+        <td><span class="sector-tag telecom">Telekom/IT</span></td>
+        <td class="wealth">309 mld. HUF<br><small style="color:var(--muted)">19,2 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge ner">NER přímý</span></td>
+      </tr>
+      <tr data-sector="ner">
+        <td class="rank">10</td>
+        <td class="name">Széles Gábor</td>
+        <td>Magyar Hírlap (deník), Echo TV, průmyslové firmy</td>
+        <td><span class="sector-tag industry">Průmysl</span><span class="sector-tag media">Média</span></td>
+        <td class="wealth">300 mld. HUF<br><small style="color:var(--muted)">18,7 mld. Kč</small></td>
+        <td style="font-size:0.78rem"><span class="sector-tag media">Magyar Hírlap</span><span class="sector-tag media">Echo TV</span></td>
+        <td><span class="ner-badge ner">NER-média</span></td>
+      </tr>
+      <tr data-sector="ner">
+        <td class="rank">11</td>
+        <td class="name">Garancsi István</td>
+        <td>Market Építő — stavebnictví, státní veřejné zakázky, Videoton FC</td>
+        <td><span class="sector-tag">Stavebnictví</span></td>
+        <td class="wealth">296 mld. HUF<br><small style="color:var(--muted)">18,4 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge ner">NER přímý</span></td>
+      </tr>
+      <tr data-sector="indep">
+        <td class="rank">12</td>
+        <td class="name">Demján Sándorné + rodina</td>
+        <td>Dědičství po Demján Sándorovi — Polus/Trigranit (reality)</td>
+        <td><span class="sector-tag realestate">Reality/Dědictví</span></td>
+        <td class="wealth">242 mld. HUF<br><small style="color:var(--muted)">15,1 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge indep">Historické dědictví</span></td>
+      </tr>
+      <tr data-sector="ner">
+        <td class="rank">13</td>
+        <td class="name">Tiborcz István</td>
+        <td>BDPST Group (hotely, reality Budapešť), Waberer's (logistika), Gránit Banka</td>
+        <td><span class="sector-tag realestate">Reality/Luxus</span><span class="sector-tag">Logistika</span></td>
+        <td class="wealth">211 mld. HUF<br><small style="color:var(--muted)">13,1 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge ner">Zeť Orbána</span></td>
+      </tr>
+      <tr data-sector="indep">
+        <td class="rank">14</td>
+        <td class="name">Rahimkulov Ruszlan</td>
+        <td>Magyar Fejlesztési Bank (fond), plynarenstvo, investice</td>
+        <td><span class="sector-tag energy">Energie/Plyn</span></td>
+        <td class="wealth">206 mld. HUF<br><small style="color:var(--muted)">12,8 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge partial">Regulatorní závis.</span></td>
+      </tr>
+      <tr data-sector="ner">
+        <td class="rank">15</td>
+        <td class="name">Futó Gábor</td>
+        <td>RE-ALT, Futureal — realitní development, NER-napojení</td>
+        <td><span class="sector-tag realestate">Reality/Dev.</span></td>
+        <td class="wealth">206 mld. HUF<br><small style="color:var(--muted)">12,8 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge ner">NER nepřímý</span></td>
+      </tr>
+      <tr data-sector="indep">
+        <td class="rank">~17</td>
+        <td class="name">Schmidt Mária + rodina</td>
+        <td>Budapesti Ingatlan Nyrt. — realitní holding (tržní majoritní vlastník)</td>
+        <td><span class="sector-tag realestate">Reality</span></td>
+        <td class="wealth">133 mld. HUF<br><small style="color:var(--muted)">8,3 mld. Kč</small></td>
+        <td style="font-size:0.78rem;color:var(--muted)">—</td>
+        <td><span class="ner-badge ner">Ideologická NER</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="method-note">
+    Data kombinují Forbes HU (říjen 2025, Top 50) a „100 leggazdagabb magyar" (květen 2025, Top 100). Hodnoty v mld. HUF (1 EUR ≈ 400 HUF). <strong>NER-status</strong> je analytické hodnocení na základě investigativních zdrojů (Direkt36, Válasz Online, Telex, Financial Times analýza 350 000 zakázek), nikoliv právní klasifikace.
+  </div>
+</div>
+
+<!-- ═══════════════ SYSTÉM NER ═══════════════ -->
+<div id="ner" class="section">
+
+  <div class="chart-section">
+    <div class="chart-title">Co je NER a proč je Maďarsko jiné?</div>
+    <div class="chart-sub">Systémové srovnání politicko-ekonomického propojení v zemích V4</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-bottom:2rem">
+      <div style="background:var(--bg2);padding:1.5rem;border-top:3px solid var(--ner)">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--ner);letter-spacing:0.1em;margin-bottom:0.6rem">🇭🇺 MAĎARSKO — SYSTÉMOVÉ PROPOJENÍ</div>
+        <ul style="font-size:0.82rem;color:var(--muted);line-height:2;list-style:none;padding:0">
+          <li>→ NER jako vědomý a pojmenovaný systém: stát → zakázky → loajální oligarchie</li>
+          <li>→ Mészáros: od instalatéra k #1 multimiliardáři za 15 let díky státním zakázkám</li>
+          <li>→ Tiborcz (zeť): hotelové impérium budované z veřejných fondů a státních hitelů</li>
+          <li>→ FT: 13 NER-oligarchů získalo 14 % veškerých státních zakázek 2010–2025</li>
+          <li>→ Mészáros sám: 14 firem, 1 080 mld. HUF ve zakázkách 2021–2023</li>
+          <li>→ KESMA: 500+ médií sdruženo v jednom holding, propojeno s Mészárosem</li>
+          <li>→ Média + zakázky + banka (MBH) = komplexní systém udržení moci</li>
+        </ul>
+      </div>
+      <div style="background:var(--bg2);padding:1.5rem;border-top:3px solid var(--indep)">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--indep);letter-spacing:0.1em;margin-bottom:0.6rem">🇨🇿🇸🇰 ČESKO / SLOVENSKO — SROVNÁNÍ</div>
+        <ul style="font-size:0.82rem;color:var(--muted);line-height:2;list-style:none;padding:0">
+          <li>→ ČR: Babiš jako jediný přímý politický oligarcha, ostatní tržní hráči</li>
+          <li>→ SK: Gorila — prokázané korupční vazby, ale ne systémový model jako NER</li>
+          <li>→ V ČR: Křetínský, Tykač, Kellnerová — bohatí ze sektorových trhů, ne ze zakázek</li>
+          <li>→ SK: Haščák, Tkáčovci — J&T a Penta z finančních trhů, ne z politického zadání</li>
+          <li>→ V MG: oligarchie je záměrně „vyráběna" státním aparátem od 2010</li>
+          <li>→ Rozdíl: V MG jde o systém, v ČR/SK o jednotlivce a skupiny</li>
+          <li>→ MG: Orbán otevřeně mluví o „národních kapitalistech" jako pilíři systému</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="chart-title">Mészáros Lőrinc — anatomie NER-bohatství</div>
+    <div class="chart-sub">Jak se gázszerelő (instalatér) z Felcsút stal nejbohatším Maďarem <span style="color:var(--muted);font-size:0.75em">· Hodnoty 2010–2022 jsou odhady dle Direkt36 a starších edic Forbes HU</span></div>
+    <div class="bar-chart">
+      <div class="bar-row">
+        <div class="bar-label">Jmění 2010 (odhad)</div>
+        <div class="bar-track"><div class="bar-fill" style="width:4%;background:var(--bar-hist)"></div></div>
+        <div class="bar-value">~0,1 mld. Kč (2010, odhad dle Direkt36)</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Jmění 2015</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:8%"></div></div>
+        <div class="bar-value">~8,9 mld. Kč · odhad · kurz 2015</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Jmění 2019</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:30%">~400 mld. HUF</div></div>
+        <div class="bar-value">~31,7 mld. Kč · odhad Forbes HU 2019 · kurz 2019</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Jmění 2022</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:55%">~700 mld. HUF</div></div>
+        <div class="bar-value">~46,1 mld. Kč · odhad Forbes HU 2022 · kurz 2022</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Jmění 2024 (přes 1 bil.)</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:78%">990 mld. HUF = 62,9 mld. Kč (kurz 2024)</div></div>
+        <div class="bar-value">62,9 mld. Kč</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Jmění 2025 (říjen)</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:100%">1 749 mld. HUF = 108,8 mld. Kč (kurz 2025)</div></div>
+        <div class="bar-value">108,8 mld. Kč</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(196,75,62,0.06);border:1px solid rgba(196,75,62,0.2);padding:1.5rem;margin-top:1.5rem">
+      <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--ner);letter-spacing:0.1em;margin-bottom:0.8rem">KLÍČOVÁ DATA — MÉSZÁROS vs. STÁTNÍ ZAKÁZKY</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;font-size:0.82rem;color:var(--muted)">
+        <div><strong style="color:var(--text);display:block;margin-bottom:0.2rem">14 firem</strong>získalo 1 080 mld. HUF ve státních zakázkách (2021–2023)</div>
+        <div><strong style="color:var(--text);display:block;margin-bottom:0.2rem">8,6 %</strong>všech státních zakázek v daném období</div>
+        <div><strong style="color:var(--text);display:block;margin-bottom:0.2rem">V-Híd Zrt.</strong>2. největší příjemce zakázek celkově: 461 mld. HUF (2021–2023)</div>
+        <div><strong style="color:var(--text);display:block;margin-bottom:0.2rem">400+</strong>firem v portfoliu — z toho velká část závislá na státních zakázkách</div>
+        <div><strong style="color:var(--text);display:block;margin-bottom:0.2rem">Tempo</strong>od roku 2010 vzrostl Mészárosův majetek z řádu milionů na přes 1 bilion HUF — tj. přibližně 10 000násobek za 15 let; žádný jiný maďarský miliardář takový nárůst nevykázal (Forbes HU)</div>
+        <div><strong style="color:var(--text);display:block;margin-bottom:0.2rem">Přátelství</strong>s Orbánem od 90. let — spoluhráč fotbalu, sused ve Felcsútu</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ VÝVOJ & PŮVOD ═══════════════ -->
+<div id="vyvoj" class="section">
+  <div class="chart-section">
+    <div class="chart-title">Původ a vývoj klíčových jmění</div>
+    <div class="chart-sub">Dva světy: NER-elita vs. skuteční podnikatelé</div>
+    <div class="profile-grid">
+
+      <div class="profile-card" style="border-top:3px solid var(--ner)">
+        <div class="card-rank">1</div>
+        <div class="card-name">Mészáros Lőrinc</div>
+        <div class="card-wealth">1 749 mld. HUF (říjen 2025) · +500 mld. YoY</div>
+        <div class="card-group"><span class="ner-badge ner">NER přímý</span> · Opus Global, MBH Banka, 400+ firem</div>
+        <div class="card-desc">Přátelí se s Orbánem od 90. let, byl starosta Felcsútu. Majetek budoval výhradně po 2010 — stavební firmy (V-Híd, Mészáros Cs.), zemědělské holdingsy, energetické firmy (Opus Global — kótovaná na BÉT), MBH Banka (sloučení tří bank). Vlastní také mediální impérium (TV2, Rádió 1, Best FM, Pesti TV). Forbes odhaduje, že každých 6 minut získá ekvivalent průměrné roční maďarské mzdy. Sám se označuje za přítele premiéra, nikoliv za „politika".</div>
+        <div class="card-origin"><strong>Původ:</strong> Instalatér → starosta ve Felcsútu → státní zakázky 2010+ → Opus Global tržní expanze → mediální akvizice → MBH Banka → první maďarský miliardář přes bilion forintů (2024)</div>
+      </div>
+
+      <div class="profile-card" style="border-top:3px solid var(--accent2)">
+        <div class="card-rank">3</div>
+        <div class="card-name">Csányi Sándor</div>
+        <div class="card-wealth">753 mld. HUF (říjen 2025)</div>
+        <div class="card-group"><span class="ner-badge partial">Fellow traveller NER</span> · OTP Bank, Bonafarm, MLSZ</div>
+        <div class="card-desc">Nejdéle #1 na seznamu (předtím než přišel Mészáros). OTP Bank přebral v 1992 ještě jako státní — proměnil ji v největší maďarskou a středoevropskou banku. Bonafarm = největší agroholding v MG. Předseda MLSZ (fotbal). Do roku 2018 fungoval jako relativně autonomní hráč — od té doby se ale OTP stalo investorem Mészárosových firem a jeho finanční provázanost s NER-podniky výrazně vzrostla. Akademická literatura označuje OTP po roce 2018 za <em>fellow traveller</em> NER, nikoliv za plně nezávislou instituci. OTP 2024: první firma v MG s ročním ziskem přes 1 000 mld. HUF (výroční zpráva OTP Bank 2024). Csányi syn Péter byl jmenován novým CEO OTP 2025.</div>
+        <div class="card-origin"><strong>Původ:</strong> OTP management 1992 → privatizace, bankovní expanze do EU → Bonafarm agroholding → MLSZ fotbalová moc → manažerský dynastický model</div>
+      </div>
+
+      <div class="profile-card" style="border-top:3px solid var(--indep)">
+        <div class="card-rank">2</div>
+        <div class="card-name">Veres Tibor</div>
+        <div class="card-wealth">756,4 mld. HUF · 47,0 mld. Kč</div>
+        <div class="card-group">Nezávislý · Wallis Csoport, Dayton Invest, Praktiker</div>
+        <div class="profile-body">
+          Jeden z mála skutečně nezávislých hráčů na špici maďarského žebříčku — a právě proto pozoruhodný. Wallis Csoport je diverzifikovaný průmyslový a investiční konglomerát budovaný organicky od 90. let: průmyslová výroba, strojírenství, finance a maloobchod (Praktiker). Dayton Invest spravuje realitní a finanční portfolio. Veres je ukázkou toho, že v Maďarsku lze dosáhnout čelního místa žebříčku bez přímého napojení na NER — ale je to cesta pomalejší, méně nápadná a vyžadující přísnou politickou neutralitu. Na rozdíl od Mészárose nebo Szíjje nevyvolává žádné investigativní zprávy o státních zakázkách. Nízký veřejný profil — v médiích prakticky neviditelný. Paradox maďarského Forbes žebříčku: jeho jmění je téměř stejně velké jako Csányiho, ale bez jakékoli politické dimenze.
+          <div class="card-origin">Průmyslové podnikání 90. let → Wallis Csoport konsolidace → Praktiker akvizice → Dayton Invest → organický růst bez státních zakázek</div>
+        </div>
+      </div>
+
+      <div class="profile-card" style="border-top:3px solid var(--indep)">
+        <div class="card-rank">4</div>
+        <div class="card-name">Felcsuti Zsolt</div>
+        <div class="card-wealth">524 mld. HUF (říjen 2025)</div>
+        <div class="card-group"><span class="ner-badge indep">100 % nezávislý</span> · MPF Holding — průmysl, export</div>
+        <div class="card-desc">Forbes ho označuje jako „nejbohatšího self-made člověka na seznamu, který nikdy neprivatizoval a nikdy neobchodoval se státem." MPF Holding vyrábí průmyslové komponenty pro globální trh. Vzácný případ čistě tržního podnikání v maďarském kontextu. Nízký mediální profil, vyhýbá se politice. Jeho existence na #4 místě dokazuje, že lze v MG bohatnout bez NER — ale je to výjimka.</div>
+        <div class="card-origin"><strong>Původ:</strong> Průmyslové podnikání → MPF Holding → globální export → organický růst bez státních zakázek</div>
+      </div>
+
+      <div class="profile-card" style="border-top:3px solid var(--ner)">
+        <div class="card-rank">5</div>
+        <div class="card-name">Szíjj László</div>
+        <div class="card-wealth">416 mld. HUF (říjen 2025)</div>
+        <div class="card-group"><span class="ner-badge ner">NER přímý</span> · MCM Épitő, Duna Aszfalt — stavebnictví</div>
+        <div class="card-desc">Stavební magnát, pravidelný vítěz státních tendrů. Jeho jachta se stala symbolem NER-luxusu: Szijjártó Péter (ministr zahraničí) i sám Mészáros na ní dovolenkovali. Investigace FT ho uvádí mezi klíčovými příjemci státních zakázek. Nízký mediální profil — na veřejnosti nepromlouvá. Typický profil NER-oligarchy: anonymní, ale extrémně bohatý z veřejných peněz.</div>
+        <div class="card-origin"><strong>Původ:</strong> Stavební firma → NER zakázky od 2010 → nárůst jmění koreluje s vládními investicemi do infrastruktury</div>
+      </div>
+
+      <div class="profile-card" style="border-top:3px solid var(--indep)">
+        <div class="card-rank">6</div>
+        <div class="card-name">Gattyán György</div>
+        <div class="card-wealth">352 mld. HUF (říjen 2025)</div>
+        <div class="card-group"><span class="ner-badge indep">Nezávislý</span> · Docler Holding — Jasmin Live (adult entertainment)</div>
+        <div class="card-desc">Zakladatel Jasmin Live — největší adult video chat platformy světa. Docler Holding sídlí na Maltě. Čistě tržní byznys bez vazby na stát. Jmění stabilní od 2015 — neroste extrémně. V Maďarsku politik spíše na krátkou dobu (Megoldás Mozgalom — Hnutí řešení). Typický self-made miliardář z digitální ekonomiky — výjimka na maďarské scéně dominované průmyslem a NER.</div>
+        <div class="card-origin"><strong>Původ:</strong> Webové služby 2000s → Jasmin Live adult platforma → Docler Holding globální → Malta rezidence</div>
+      </div>
+
+      <div class="profile-card" style="border-top:3px solid var(--indep)">
+        <div class="card-rank">8</div>
+        <div class="card-name">Pavelka Tibor</div>
+        <div class="card-wealth">310 mld. HUF (říjen 2025) · nováček 2025</div>
+        <div class="card-group"><span class="ner-badge indep">100 % nezávislý</span> · Semilab — měřicí přístroje, solár, půlvodiče</div>
+        <div class="card-desc">Semilab zal. 1989 — 15 fyziků odešlo z MTA (Maďarská akademie věd). Dnes největší výrobce měřicích přístrojů pro solární průmysl na světě, 5. největší pro polovodičový průmysl. Zákazníci: Microsoft, Samsung, IBM, Sony, Bosch. Americká dceřina společnost nabídnuta za 185 mld. HUF 2025. Exemplární případ technologického bohatství bez politické podpory — ale tím pádem méně viditelný a méně slavný v Maďarsku.</div>
+        <div class="card-origin"><strong>Původ:</strong> Fyzikovský tým z MTA 1989 → Semilab → solární boom → globální leadership v niche měřicí technice</div>
+      </div>
+
+      <div class="profile-card" style="border-top:3px solid var(--ner)">
+        <div class="card-rank">9</div>
+        <div class="card-name">Jászai Gellért</div>
+        <div class="card-wealth">309 mld. HUF (říjen 2025) · z 138 mld. HUF v 2024</div>
+        <div class="card-group"><span class="ner-badge ner">NER přímý</span> · 4iG — telekomunikace, IT, kosmický průmysl</div>
+        <div class="card-desc">Jászai byl Mészárosovým pravou rukou při akvizicích. 4iG — telekomunikační holding budovaný agresivními akvizicemi pod Orbánovou vládou, s jasnou preferencí před státními tendry. 4iG vstoupil do kosmického průmyslu — Maďarsko přidalo satelitní ambice do NER projektu. Jászai zdvojnásobil majetek za rok — nejrychleji rostoucí oligarcha 2024. Typický profil: loajalita k NER → přístup ke zakázkám → rychlý vzestup.</div>
+        <div class="card-origin"><strong>Původ:</strong> Manažer → Mészárosův partner → 4iG akvizice s NER výhodami → telekomunikace + kosmický průmysl</div>
+      </div>
+
+      <div class="profile-card" style="border-top:3px solid var(--ner)">
+        <div class="card-rank">13</div>
+        <div class="card-name">Tiborcz István</div>
+        <div class="card-wealth">211 mld. HUF (2025) · Válasz Online: reálný majetek 3× vyšší</div>
+        <div class="card-group"><span class="ner-badge ner">Zeť Orbána</span> · BDPST Group, Waberer's, Gránit Banka</div>
+        <div class="card-desc">Tiborcz István je manžel Orbán Ráhel (dcery premiéra). BDPST Group — 11+ luxusních historických paláců v Budapešti, hotely (Dorothea, Marriott contract). Waberer's — logistika (51 %). Gránit Banka. Válasz Online investigace: skutečný majetek odhadnut na trojnásobek Forbes čísla díky skrytým fondům. Elios (firma dříve napojená na Tiborcze) vyšetřována OLAF pro EU dotační podvody 2016. Tiborcz od 2015 deklaruje, že se vyhýbá státním zakázkám — investigativní média to zpochybňují.</div>
+        <div class="card-origin"><strong>Původ:</strong> Elios (LED veřejné osvětlení, EU dotace) → OLAF vyšetřování → odchod z firmy → BDPST Group realitní impérium → hotelový luxus z veřejných fondů</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="chart-section" style="margin-top:2rem">
+    <div class="chart-title">Vývoj Top 100 celkového jmění v čase</div>
+    <div class="chart-sub">Kumulativní odhad dle dostupných žebříčků (mld. HUF)</div>
+    <div class="bar-chart">
+      <div class="bar-row">
+        <div class="bar-label">2010 (Orbán nastupuje)</div>
+        <div class="bar-track"><div class="bar-fill" style="width:10%;background:var(--bar-hist)"></div></div>
+        <div class="bar-value">~115 mld. Kč · ~1 200 mld. HUF (odhad) · kurz 2010</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">2015</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:30%"></div></div>
+        <div class="bar-value">~313 mld. Kč · ~3 500 mld. HUF (odhad) · kurz 2015</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">2019</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:50%"></div></div>
+        <div class="bar-value">~436 mld. Kč · ~5 500 mld. HUF (odhad) · kurz 2019</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">2022</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:72%"></div></div>
+        <div class="bar-value">~527 mld. Kč · ~8 000 mld. HUF (odhad) · kurz 2022</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">2024</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:84%">9 100 mld. HUF = 579 mld. Kč (kurz 2024)</div></div>
+        <div class="bar-value">579 mld. Kč</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">2025 (Top 100)</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:100%">11 020 mld. HUF = 685 mld. Kč (kurz 2025)</div></div>
+        <div class="bar-value">685 mld. Kč</div>
+      </div>
+    </div>
+    <div class="method-note" style="margin-top:1rem">Nárůst jmění maďarské elity od 2010 (nastoupení Orbána) do 2025 je ~8× — výrazně rychleji než ekonomický růst HDP (cca 2–3×). Analytici to přičítají kombinaci EU fondů, státních zakázek a NER systémového zvýhodňování. <span style="color:var(--muted);font-size:0.85em">Srovnávací kontext: české Top 100 vzrostlo ve stejném období přibližně 7×, slovenské přibližně 8×. Část nárůstu ve všech třech zemích odráží globální zhodnocení aktiv, nízké úrokové sazby a středoevropský ekonomický boom 2013–2019. Maďarský případ se od sousedů liší strukturou růstu — nikoliv nutně jeho absolutní velikostí.</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════ POLITIKA ═══════════════ -->
+<div id="politika" class="section">
+  <div class="chart-section">
+    <div class="chart-title">Politické vazby — NER jako systém</div>
+    <div class="chart-sub">
+      Maďarsko je v rámci V4 extrémní případ: NER (Nemzeti Együttműködés Rendszere) je záměrně pojmenovaný systém propojení politiky, byznysu a médií.
+      <span style="color:var(--ner)"> ⚠ Doloženo investigativními médii (Direkt36, Válasz Online, Telex, FT) a OLAF. Není to spekulace — je to zdokumentovaná struktura.</span>
+    </div>
+
+    <div class="pol-grid">
+
+      <div class="pol-card ner-direct">
+        <div class="pol-name">Mészáros Lőrinc</div>
+        <div class="pol-level ner-direct">Přímý NER · #1 Bohatství = státní zakázky</div>
+        <div class="pol-desc">Přátelé s Orbánem od 90. let, sousedé, spoluhráči fotbalu. Jmění zcela koreluje s politickým programem: každá vládní investice do infrastruktury, energie nebo zemědělství přinesla zakázky Mészárosovým firmám. FT analýza: 14 firem, 1 080 mld. HUF (2021–23). Vládní mediální holdingy (TV2, KESMA) skrze prostředníky napojeny na Mészárose. „Miliardář z milosti systému" — bohatství z politické přízně, nikoliv tržní inovace.</div>
+      </div>
+
+      <div class="pol-card ner-direct">
+        <div class="pol-name">Tiborcz István</div>
+        <div class="pol-level ner-direct">Přímá rodinná vazba · zeť premiéra</div>
+        <div class="pol-desc">Manžel Orbán Ráhel. Elios (LED osvětlení) — OLAF vyšetřování pro EU dotační podvody 2016, firma přešla na jiné vlastníky. BDPST Group: hotely a reality financovány z veřejných fondů (500 mld. HUF veřejného financování dle Válasz Online). Waberer's (logistika) — 88% nárůst jmění za rok 2024. Deklaruje, že se vyhýbá státním zakázkám — investigativci popírají. Skutečné jmění odhadováno až 3× výše než Forbes číslo.</div>
+      </div>
+
+      <div class="pol-card ner-direct">
+        <div class="pol-name">Szíjj László</div>
+        <div class="pol-level ner-direct">NER stavební magnát · Přímý</div>
+        <div class="pol-desc">Stavebnictví — přímá korelace s vládními infrastrukturními programy. Na jeho jachtě dovolenkoval ministr Szijjártó i Mészáros. Vítěz dálničních a mostních tendrů. Žádné mediální aktivity — čistě ekonomická NER-entita. FT ho uvádí jako klíčového příjemce státních zakázek.</div>
+      </div>
+
+      <div class="pol-card ner-direct">
+        <div class="pol-name">Garancsi István</div>
+        <div class="pol-level ner-direct">NER stavebnictví · Videoton FC</div>
+        <div class="pol-desc">Market Épitő — stavební firma s pravidelným přístupem ke státním zakázkám. Vlastní Videoton FC — sport jako NER měkká síla. Orbán a Mészáros sdílejí zájem o fotbal jako politický nástroj (Puskás Akadémia FC, 3,5 mld. HUF stadion ve vesnici 1 700 obyvatel).</div>
+      </div>
+
+      <div class="pol-card ner-direct">
+        <div class="pol-name">Jászai Gellért / 4iG</div>
+        <div class="pol-level ner-direct">NER telekomunikace · 2. generace</div>
+        <div class="pol-desc">4iG budovala pozici pod NER-záštitou: akvizice telekomunikačních firem, státní IT zakázky, kosmický program. Jászai byl Mészárosovým partnerem při byznysu. Jmění se zdvojnásobilo za 1 rok (138 → 309 mld. HUF). Typická „2. generace NER" — nepřátelé premiéra, ale plně závislí na vládním přístupu ke zakázkám a licencím.</div>
+      </div>
+
+      <div class="pol-card ner-direct">
+        <div class="pol-name">Széles Gábor</div>
+        <div class="pol-level ner-direct">NER-média · Ideologický pilíř</div>
+        <div class="pol-desc">Vlastní Magyar Hírlap (proodbánský deník) a Echo TV (zpravodajský kanál). Otevřeně se hlásí k Fidészu. Na rozdíl od KESMA-médií (Mészáros) jsou Széles-média přímo vlastněna a editorsky řízena jako politický nástroj. Průmyslové firmy doplňují mediální aktivity.</div>
+      </div>
+
+      <div class="pol-card partial">
+        <div class="pol-name">Csányi Sándor / OTP</div>
+        <div class="pol-level partial">Fellow traveller NER · autonomní, ale systémově propojený</div>
+        <div class="pol-desc">OTP Bank budoval svou pozici před Orbánovým nástupem a je skutečně autonomnějším hráčem než klasičtí NER-oligarchové. Akademická literatura (Socio-Economic Review, Oxford 2022) ho ale popisuje jako <em>fellow traveller</em> NER — od roku 2018 OTP začalo investovat do Mészárosových firem a Átlátszó odhaduje, že OTP má třetí největší finanční provázanost s NER-podniky po MKB a Eximbance. Csányi sám říká, že „pomáhá, kde může" — ale pouze dokud to nepoškodí jeho vlastní zájmy. OTP expanduje agresivně v EU (Srbsko, Bulharsko, Chorvatsko, Slovinsko, Albánie), Orbán ho na AGM v dubnu 2025 veřejně pochválil jako „národního šampiona". Csányi jako předseda MLSZ je v NER politické orbě, ale zachovává si větší autonomii než typičtí NER-klienti — vzácná, ale ne plně nezávislá pozice.</div>
+      </div>
+
+      <div class="pol-card indep">
+        <div class="pol-name">Felcsuti Zsolt / Pavelka Tibor / Gattyán György</div>
+        <div class="pol-level indep">Skutečně nezávislí · Tržní úspěch</div>
+        <div class="pol-desc">Tito tři jsou výjimkami v maďarském kontextu. Felcsuti (průmysl export) nikdy neprivatizoval ani neobchodoval se státem. Pavelka (Semilab) vybudoval globálního lídra v niche technologii. Gattyán (Jasmin Live) — digitální tržní úspěch ze zahraničí. Jejich bohatství dokazuje, že v Maďarsku lze bohatnout bez NER — ale je to podstatně těžší a méně efektivní.</div>
+      </div>
+
+      <div class="pol-card" style="border-left:4px solid #888;background:var(--bg2)">
+        <div class="pol-name">NER-losers — vytlačení a exulanti</div>
+        <div class="pol-level partial">Systémový rys: loajalita, nebo odchod</div>
+        <div class="pol-desc">Analýza NER-bohatství by byla neúplná bez pohledu na ty, kteří byli systémem vytlačeni — právě tato dynamika je jedním z nejsilnějších dokladů systémového charakteru NER, ne jen korupčních individuí.
+          <br><br>
+          <strong>Simicska Lajos</strong> — původní Orbánův klíčový oligarcha a architekt NER-mediálního systému (Magyar Nemzet, Lánchíd Rádió, Közgép stavební firma). Po osobní roztržce s Orbánem v roce 2015 se stal jeho otevřeným kritikem. Média postupně prodal nebo zavřel, stavební firma ztratila přístup ke státním zakázkám. Případ Simicska ukazuje, že NER nevyžaduje jen loajalitu — vyžaduje bezpodmínečnou podřízenost.
+          <br><br>
+          <strong>Spéder Zoltán</strong> — bankovní magnát a Orbánův dlouholetý spolupracovník. V roce 2016 byl donucen vzdát se kontroly nad FHB bankou a dalšími mediálními aktivy (index.hu, Origo). Původně byl jedním z pilířů NER-finančního systému, po ztrátě Orbánovy přízně byl z trhu vytlačen. Případ je zdokumentován Direkt36.
+          <br><br>
+          <strong>Gattyán György</strong> (#6 žebříčku) — bohatý z digitální ekonomiky bez NER-vazeb, rezident Malty. Aktivně se angažoval v politice (Megoldás Mozgalom, 2022), ale rychle pochopil limity a politiku opustil. Přesunutí aktiv mimo Maďarsko je racionální odpovědí na systémové riziko.
+          <br><br>
+          <strong>Řada středních podnikatelů</strong> — dokumentuje Átlátszó: firmy konkurující NER-firmám v tendru opakovaně prohrávají bez ohledu na kvalitu nabídky. Hospodářská soutěž v sektorech závislých na veřejných zakázkách (stavebnictví, IT, zemědělství, energie) je de facto eliminována. Výsledkem je, že tržně úspěšní, ale politicky neutrální podnikatelé rostou pomaleji nebo odcházejí.
+          <br><br>
+          Vzorec je konzistentní: <em>přijmi pravidla NER, nebo ztratíš přístup k trhu</em>. Tento mechanismus vytlačování je stejně důležitý pro pochopení systému jako příběhy o vzestupu Mészárose.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="method-note" style="margin-top:2rem">
+      <strong>Doložené zdroje:</strong> Financial Times (březen 2026): analýza 350 000 veřejných zakázek 2010–2025 — 13 NER-oligarchů získalo 14 % všech zakázek. Direkt36: investigativní dokumentace Mészáros, Tiborcz a BDPST. Válasz Online: NER-akták (50 nejvíce kontroverzních obchodů Orbánovy éry). Transparency International MG: V-Híd = 2. největší příjemce zakázek 2021–2023. OLAF: vyšetřování Elios (Tiborcz). <strong>Toto není spekulace — jde o doloženou strukturu.</strong>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MÉDIA ═══════════════ -->
+<div id="media" class="section">
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Podíl NER-médií na trhu</div>
+      <div class="stat-value">~64 %</div>
+      <div class="stat-note">příjmů ze zpravodajství (Mérték 2019); RSF 2025 odhaduje ~80 % médií pod provládním vlivem</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Včetně veřejnoprávních médií</div>
+      <div class="stat-value">~78 %</div>
+      <div class="stat-note">zpravodajsko-veřejné scény pod NER-vlivem (Mérték 2019); situace se od té doby dále zhoršila</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">KESMA — počet médií</div>
+      <div class="stat-value">500+</div>
+      <div class="stat-note">500+ médií sdruženo pod KESMA od října 2018 (HVG, Atlatszo.hu — zdokumentováno)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">TV2 tržby 2024</div>
+      <div class="stat-value">56,3 mld.</div>
+      <div class="stat-note">HUF tržby TV2 2024 (výroční zpráva — nepřímý zdroj) · největší komerční TV MG dle sledovanosti</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Nezávislé médium #1</div>
+      <div class="stat-value">Telex.hu</div>
+      <div class="stat-note">Zal. 2020 po masovém odchodu redakce Index.hu; předplatitelský model (Telex.hu)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Index.hu převzetí</div>
+      <div class="stat-value">2020</div>
+      <div class="stat-note">Redakce hromadně odešla po zásahu NER-napojených vlastníků — zdokumentováno (Mérték, HVG 2020)</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-title">Maďarský mediální systém — NER vs. nezávislí</div>
+    <div class="chart-sub">Stav 2025 · Maďarsko má nejkoncentrovanější provládní mediální trh v EU</div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1px;background:var(--border);margin-bottom:2rem">
+
+      <div style="background:var(--bg2);padding:1.5rem;border-top:3px solid var(--ner)">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:var(--ner);margin-bottom:0.4rem">MÉSZÁROS LŐRINC — TV2 GROUP + KESMA</div>
+        <div style="font-size:0.82rem;line-height:1.8">
+          <strong>TV:</strong> TV2, Super TV2, Prime, Spíler1, Spíler2, Mozi+, TV2 Kids + 7 dalších kanálů<br>
+          <strong>Rádio:</strong> Rádió 1 (síť), Best FM — pokrytí 80 %+ území MG<br>
+          <strong>Online:</strong> Tények.hu (zpravodajský portál TV2), Pesti Srácok<br>
+          <strong>Tisk:</strong> KESMA napojení (500+ médií) — Magyar Nemzet, Ripost aj.<br>
+          <strong>Tržby TV2:</strong> 56,3 mld. HUF (2024, výroční zpráva TV2 — nepřímý zdroj)
+        </div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.8rem;border-top:1px solid var(--border);padding-top:0.6rem">TV2 vlastní Andy Vajna (zemřel 2019), přešlo pod Mészáros-napojené struktury. Skupiny KESMA se TV2 formálně neúčastní, ale sdílí reklamu přes Atmedia (Mészáros-napojení).</div>
+      </div>
+
+      <div style="background:var(--bg2);padding:1.5rem;border-top:3px solid #903030">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:#903030;margin-bottom:0.4rem">KESMA — Közép-Európai Sajtó és Média Alapítvány</div>
+        <div style="font-size:0.82rem;line-height:1.8">
+          <strong>Tisk:</strong> Magyar Nemzet (vlajkový deník), Ripost, Lokál, 24 krajských deníků (Mediaworks)<br>
+          <strong>Rádio:</strong> Retro Rádió, Karc FM, Gong<br>
+          <strong>TV:</strong> Hír TV (zpravodajský), Echo TV (Széles Gábor)<br>
+          <strong>Tržby KESMA:</strong> 57 mld. HUF (2024) — největší mediální firma dle tržeb<br>
+          <strong>Reklama:</strong> Atmedia (Mészáros-napojení) jako centrální reklamní zastupitel
+        </div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.8rem;border-top:1px solid var(--border);padding-top:0.6rem">KESMA zal. 2018 — dobrovolné sdružení 500+ médií s "konzervativními hodnotami". Předseda KESMA kuratoria: Bajkai István = Orbánův osobní právník. Právník, který přepsal KESMA zakladatelské práva 2020 = Mészárosův právník.</div>
+      </div>
+
+      <div style="background:var(--bg2);padding:1.5rem;border-top:3px solid var(--blue)">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:var(--blue);margin-bottom:0.4rem">RTL MAGYARORSZÁG — NEZÁVISLÁ JEDNIČKA</div>
+        <div style="font-size:0.82rem;line-height:1.8">
+          <strong>TV:</strong> RTL (hlavní), Film+, Cool, Sorozat+, RTL Otthon, Moziklub, Muzsika TV + 12 kanálů<br>
+          <strong>Sledovanost:</strong> Přibližně na úrovni TV2 skupiny, v cílové skupině 18–59 let RTL vede<br>
+          <strong>Tržby:</strong> ~56,6 mld. HUF (2024, výroční zpráva — nepřímý zdroj) — těsně před TV2<br>
+          <strong>Majitel:</strong> RTL Group (Bertelsmann) — zahraniční vlastník bez maďarského politického zájmu<br>
+          <strong>Zpravodajství:</strong> Relativně nezávislé, kritické vůči vládě
+        </div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.8rem;border-top:1px solid var(--border);padding-top:0.6rem">RTL Magyarország je fakticky nejsilnějším nezávislým zpravodajstvím v lineárním TV vysílání. Zahraniční vlastnictví chrání před NER přístupem — ale vládní mediální rada (NMHH) může komplikovat licence.</div>
+      </div>
+
+      <div style="background:var(--bg2);padding:1.5rem;border-top:3px solid var(--indep)">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:var(--indep);margin-bottom:0.4rem">NEZÁVISLÁ MÉDIA — TELEX, 444, DIREKT36</div>
+        <div style="font-size:0.82rem;line-height:1.8">
+          <strong>Telex.hu:</strong> Zal. 2020 po odchodu z Index.hu — předplatitelský model, 70 000+ předplatitelů<br>
+          <strong>444.hu:</strong> Investigativní a zpravodajský web — Atlatszo.hu partnerství<br>
+          <strong>Direkt36:</strong> Investigativní centrum — kauzy Mészáros, Tiborcz, NER<br>
+          <strong>HVG:</strong> Tradiční liberální týdeník — pod tlakem, ale nezávislý<br>
+          <strong>Közélet.hu, ATV:</strong> Menší, ale fungující nezávislé platformy
+        </div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.8rem;border-top:1px solid var(--border);padding-top:0.6rem">Nezávislá média přežívají díky předplatnému a zahraničním grantům. Vláda jim fakticky znemožňuje přístup k reklamám ze státních firem a veřejného sektoru — jde o ekonomický tlak, nikoliv přímou cenzuru.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-title">Podíl NER-médií na maďarském mediálním trhu</div>
+    <div class="chart-sub">Data: Mérték Médiaelemző Műhely 2019 — situace od té doby se dále zhoršila <span style="color:var(--muted);font-size:0.75em">· Data: Mérték Média Monitor 2019 — RSF 2025 odhaduje ~80 %; čísla 2019 jsou pravděpodobně konzervativní</span></div>
+    <div class="bar-chart">
+      <div class="bar-row">
+        <div class="bar-label">NER+KESMA+TV2 (bez veřejné media)</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:64%">64 % příjmů ze zpravodajských médií (Mérték 2019)</div></div>
+        <div class="bar-value">~64 % (Mérték 2019, odhad)</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Vč. veřejnoprávní média (MTVA)</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:78%">77,8 % zpravodajsko-veřejné scény</div></div>
+        <div class="bar-value">~78 % (Mérték 2019, odhad)</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Tisk: NER-podíl</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:65%">~65 % krajských + celostátních deníků pod NER</div></div>
+        <div class="bar-value">~65 % (Mérték 2019, odhad)</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">TV: NER+TV2 vs. RTL</div>
+        <div class="bar-track"><div class="bar-fill c-ner" style="width:55%">TV2+NER vs RTL: přibližně 55:45 v sledovanosti (sporné — RTL v 2025–26 překonává TV2 ve zpravodajství)</div></div>
+        <div class="bar-value">~55 % NER (odhad, sporné)</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Online: NER vs. nezávislí</div>
+        <div class="bar-track"><div class="bar-fill" style="width:45%;background:linear-gradient(90deg,#306030,#508050)">Telex, 444, HVG, Direkt36 — silní online</div></div>
+        <div class="bar-value">online: vyrovnanější</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-title">Klíčové mediální kauzy</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
+      <div style="background:var(--bg2);padding:1.5rem">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--ner);letter-spacing:0.1em;margin-bottom:0.6rem">⚠ PŘÍPADY NER-MEDIÁLNÍ MOCI</div>
+        <ul style="font-size:0.82rem;color:var(--muted);line-height:2;list-style:none;padding:0">
+          <li>→ <strong>Index.hu 2020:</strong> Největší maďarský zpravodajský web — po vstupu NER-napojených vlastníků byl odvolán šéfredaktor. Osmdesát novinářů následně odešlo a založilo Telex.hu</li>
+          <li>→ <strong>KESMA 2018:</strong> 500+ médií sdruženo „dobrovolně" do jednoho holdingu — fakticky pod kontrolou Mészárose/Fideszu. EU Competition: KESMA osvobozena od přezkoumání kvůli "veřejnému zájmu"</li>
+          <li>→ <strong>Klubrádio 2021:</strong> Opoziční rádio přišlo o licenci rozhodnutím regulátora NMHH. Pokračuje pouze online.</li>
+          <li>→ <strong>Origo.hu:</strong> Dříve nezávislý zpravodajský server — pod vládním vlivem přijal provládní redakční linii</li>
+          <li>→ <strong>Reklamy:</strong> Státní firmy a veřejné instituce inzerují výhradně v NER-médiích — jde o ekonomické přetlačování, nikoliv cenzuru</li>
+        </ul>
+      </div>
+      <div style="background:var(--bg2);padding:1.5rem">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--indep);letter-spacing:0.1em;margin-bottom:0.6rem">✓ PROTIVÁHY — PŘEŽITÍ NEZÁVISLÝCH</div>
+        <ul style="font-size:0.82rem;color:var(--muted);line-height:2;list-style:none;padding:0">
+          <li>→ <strong>Telex.hu:</strong> Předplatitelský model s více než 70 000 platícími čtenáři zajišťuje finanční nezávislost na státní reklamě</li>
+          <li>→ <strong>RTL Magyarország:</strong> Zahraniční vlastník (Bertelsmann) = ochrana před NER přístupem</li>
+          <li>→ <strong>Direkt36:</strong> Investigativní centrum financované z grantů — systematicky dokumentuje NER-kauzy</li>
+          <li>→ <strong>Atlatszo.hu:</strong> FOIA-based investigativní platforma — zpřístupňuje státní data</li>
+          <li>→ <strong>EU tlak:</strong> Evropský zákon o svobodě médií (EMFA 2024) — nový regulatorní rámec</li>
+          <li>→ <strong>Sociální sítě:</strong> Fragment nezávislé komunikace mimo tradiční média</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="method-note">
+    <strong>Metodická poznámka:</strong> Data o mediálních tržních podílech dle Mérték Médiaelemző Műhely (2019) — situace od té doby se dále zhoršila. Reporters Without Borders (RSF 2025) odhaduje, že ~80 % maďarských médií funguje jako provládní nástroj. Republikon Institute (2025) zdokumentoval poměr pokrytí Fidesz vs. Tisza ve státních médiích: 15 hodin pozitivního ku 5 hodinám kritického zpravodajství týdně. Čísla 64 % a 78 % z roku 2019 jsou proto pravděpodobně konzervativní odhady. Sledovanost TV dle NMHH Media Market Report 2025. Poměr TV2 vs. RTL je sporný — RTL Magyarország v průzkumech 2025–26 konzistentně překonává TV2 ve sledovanosti zpravodajských pořadů; celkový poměr závisí na metodice měření. Tržby dle veřejných finančních výkazů (finstat/e-cégnyilvántartás). <strong>NER-status médií je analyticky hodnocen dle vlastnické struktury, editorských linií a finančních toků — nikoliv podle vlastní deklarace médií.</strong>
+  </div>
+</div>
+
+<!-- ═══════════════ KONCENTRACE ═══════════════ -->
+<div id="koncentrace" class="section">
+  
+    <div style="background:var(--bg3);border-left:3px solid var(--accent);padding:1rem 1.2rem;margin:1.5rem 0;font-size:0.78rem;color:var(--muted);line-height:1.6">
+      <strong style="color:var(--text)">Metodická poznámka:</strong> Podíl jmění Top 100 na HDP (~13,5 %) je výpočet z dat Forbes HU a KSH — srovnání tokového ukazatele (HDP) se stavovým (jmění) je metodicky zjednodušené. Mediální podíly NER vycházejí z Mérték Média Monitor 2019 — jde o nejcitovanější dostupná data; RSF 2025 uvádí ~80 %, Republikon (2025) zdokumentoval 15 h pozitivního pokrytí Fidesz vs. 5 h kritického Tiszy týdně ve státních médiích — čísla 2019 jsou konzervativní odhadalezena. Historické hodnoty Top 100 pro roky 2010–2022 jsou odhady z dostupných edic 100 leggazdagabb. Přepočty HUF→Kč použity průměrné roční kurzy dle ČNB/exchange-rates.org.
+    </div>
+<div class="chart-section">
+    <div class="chart-title">Koncentrace bohatství: Maďarsko v kontextu</div>
+
+    <div class="stat-grid" style="margin-bottom:2rem">
+      <div class="stat-card">
+        <div class="stat-label">Celk. jmění Top 100 (2025)</div>
+        <div class="stat-value">11 020 mld.</div>
+        <div class="stat-note">HUF · ≈ 27,6 mld. EUR · meziročně +22 % (100 leggazdagabb, květen 2025 — Index.hu)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">HDP Maďarska 2024</div>
+        <div class="stat-value">81 448 mld.</div>
+        <div class="stat-note">HUF (KSH 2024) · Top 100 vlastní ~13,5 % ročního HDP</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Podíl Top 10</div>
+        <div class="stat-value">~47 %</div>
+        <div class="stat-note">319,6 mld. Kč (5 138 mld. HUF / Top 10) z 685 mld. Kč — výpočet z dat 100 leggazdagabb 2025</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Mészáros — podíl na jmění Top 100</div>
+        <div class="stat-value">~16 %</div>
+        <div class="stat-note">108,8 mld. Kč (Mészáros, Forbes HU říjen 2025) z 685 mld. Kč (Top 100) = ~16 %</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Nárůst jmění Mészárose (2010–2025)</div>
+        <div class="stat-value">~1 750×</div>
+        <div class="stat-note">Nárůst: z ~0,1 mld. Kč (2010) na 108,8 mld. Kč (2025) za 15 let</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Top 10 vs. státní výdaje na zdravotnictví</div>
+        <div class="stat-value">2×</div>
+        <div class="stat-note">Top 50 jmění ≈ 2× státní výdaje na zdravotnictví (Forbes HU říjen 2025; srovnání KSH)</div>
+      </div>
+    </div>
+
+    <div class="chart-title" style="margin-bottom:0.4rem">Maďarsko vs. ostatní V4</div>
+    <div class="chart-sub">Relativní velikost jmění elit vůči HDP</div>
+    <div class="bar-chart">
+      <div class="bar-row">
+        <div class="bar-label">MG Top 100 / HDP</div>
+        <div class="bar-track"><div class="bar-fill" style="width:14%;background:linear-gradient(90deg,#505050,#707070)">685 mld. Kč · ~14 % HDP</div></div>
+        <div class="bar-value">~14 % HDP · Top 100</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">CZ Top 100 / HDP</div>
+        <div class="bar-track"><div class="bar-fill" style="width:51%;background:linear-gradient(90deg,#a07030,#c09040)">2 900 mld. Kč = ~36 % HDP CZ</div></div>
+        <div class="bar-value">~36 % HDP</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">SK Top 60 / HDP</div>
+        <div class="bar-track"><div class="bar-fill" style="width:20%;background:linear-gradient(90deg,#203040,#3060a0)">592 mld. Kč (24 mld. EUR) = ~18 % HDP SK</div></div>
+        <div class="bar-value">~18 % HDP</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(196,75,62,0.05);border:1px solid rgba(196,75,62,0.2);padding:1.5rem;margin-top:2rem">
+      <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--ner);letter-spacing:0.1em;margin-bottom:0.8rem">🔍 PROČ JE MG PODÍL ZDÁNLIVĚ NIŽŠÍ NEŽ CZ?</div>
+      <p style="font-size:0.82rem;color:var(--muted);line-height:1.6">Maďarský Top 100 má absolutně menší majetek než český Top 100 (11 020 mld. HUF ≈ 27,6 mld. EUR vs. ~116 mld. EUR v ČR — ale CZ HDP je ~8 000 mld. Kč, takže podíl CZ elit je ~36 %, nikoliv 51 %) — ale to neznamená méně koncentrovanou moc. V Maďarsku <strong>státní mechanismus zajišťuje redistribuci bohatství</strong> prostřednictvím NER systému. Skutečná moc je tedy kombinací formálního jmění + přístupu ke státním zakázkám + kontroly médií. <strong>Mészáros s 14 % Top-100-majetku ale kontrolou TV2, KESMA a státních zakázek má reálně nesrovnatelně větší moc</strong> než by odpovídalo čistě číselné hodnotě jmění.</p>
+    </div>
+
+    <div class="chart-section" style="margin-top:2rem">
+      <div class="chart-title">Srovnání V4 elit — systémové rozdíly</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1px;background:var(--border)">
+        <div style="background:var(--bg2);padding:1.5rem">
+          <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--ner);letter-spacing:0.1em;margin-bottom:0.5rem">🇭🇺 MAĎARSKO</div>
+          <ul style="font-size:0.82rem;color:var(--muted);line-height:1.8;list-style:none;padding:0">
+            <li>→ NER = systémový model od 2010</li>
+            <li>→ Stát vědomě "vyrábí" oligarchii</li>
+            <li>→ Média 78 % pod NER-vlivem</li>
+            <li>→ Mészáros = symbol NER-úspěchu</li>
+            <li>→ EU fondů zneužíváno systémově</li>
+            <li>→ Nejhorší hodnocení RSF za svobodu tisku v EU</li>
+          </ul>
+        </div>
+        <div style="background:var(--bg2);padding:1.5rem">
+          <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--accent3);letter-spacing:0.1em;margin-bottom:0.5rem">🇨🇿 ČESKO</div>
+          <ul style="font-size:0.82rem;color:var(--muted);line-height:1.8;list-style:none;padding:0">
+            <li>→ Babiš = výjimka, nikoliv systém</li>
+            <li>→ Bohatství z tržních sektorů</li>
+            <li>→ Lex Babiš = regulace politiků v médiích</li>
+            <li>→ NER-analogický model není</li>
+            <li>→ ČT + Seznam jako silné protiváhy</li>
+            <li>→ Střední hodnocení RSF svobody tisku</li>
+          </ul>
+        </div>
+        <div style="background:var(--bg2);padding:1.5rem">
+          <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--blue);letter-spacing:0.1em;margin-bottom:0.5rem">🇸🇰 SLOVENSKO</div>
+          <ul style="font-size:0.82rem;color:var(--muted);line-height:1.8;list-style:none;padding:0">
+            <li>→ Gorila = doložená korupce, ne systém</li>
+            <li>→ J&T, Penta z finančních trhů</li>
+            <li>→ Fico blízký Világi/Kaliňák — méně systémový</li>
+            <li>→ Vražda Kuciaka jako symbolický bod</li>
+            <li>→ Denník N jako silná protiváha</li>
+            <li>→ Horší než CZ, lepší než MG v RSF</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="method-note">
+      <strong>Metodická poznámka a kurzy:</strong> Jmění v mld. HUF. Přepočet na Kč: průměrné roční kurzy HUF/CZK dle exchange-rates.org — 2025: 0,0622; 2024: 0,0636; 2023: 0,0629; 2022: 0,0659; 2021: 0,0706; 2019: 0,0793; 2015: ~0,0893; 2010: ~0,0956 Kč/HUF. HDP data z Eurostat 2024. Mediální podíly dle Mérték (2019) — mezitím proběhly další koncentrace. NER-analýza dle FT (350 000 zakázek, březen 2026), Direkt36, Válasz Online, Transparency International MG. <strong>Tato analýza popisuje struktury a doložené jevy — nejde o hodnocení legálnosti jednotlivých transakcí.</strong>
+    </div>
+
+  <div style="background:var(--bg3);border:1px solid var(--border);padding:1.2rem 1.5rem;margin-top:2rem;font-size:0.78rem;line-height:1.8">
+    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.15em;color:var(--accent);margin-bottom:0.6rem">POUŽITÉ KURZY HUF/CZK (průměr exchange-rates.org)</div>
+    <table style="border-collapse:collapse;width:100%;font-family:'DM Mono',monospace;font-size:0.72rem">
+      <tr style="color:var(--muted)"><th style="text-align:left;padding:0.2rem 1rem 0.2rem 0">Rok</th><th style="text-align:right;padding:0.2rem 1rem">HUF/CZK</th><th style="text-align:right;padding:0.2rem 1rem">EUR/HUF</th><th style="text-align:left;padding:0.2rem 0">Poznámka</th></tr>
+      <tr><td style="padding:0.15rem 1rem 0.15rem 0">2010</td><td style="text-align:right;padding:0.15rem 1rem">0,0956</td><td style="text-align:right;padding:0.15rem 1rem">~264</td><td>Silnější forint</td></tr>
+      <tr><td style="padding:0.15rem 1rem 0.15rem 0">2015</td><td style="text-align:right;padding:0.15rem 1rem">0,0893</td><td style="text-align:right;padding:0.15rem 1rem">~305</td><td></td></tr>
+      <tr><td style="padding:0.15rem 1rem 0.15rem 0">2019</td><td style="text-align:right;padding:0.15rem 1rem">0,0793</td><td style="text-align:right;padding:0.15rem 1rem">~324</td><td></td></tr>
+      <tr><td style="padding:0.15rem 1rem 0.15rem 0">2021</td><td style="text-align:right;padding:0.15rem 1rem">0,0706</td><td style="text-align:right;padding:0.15rem 1rem">~363</td><td></td></tr>
+      <tr><td style="padding:0.15rem 1rem 0.15rem 0">2022</td><td style="text-align:right;padding:0.15rem 1rem">0,0659</td><td style="text-align:right;padding:0.15rem 1rem">~373</td><td>Forint oslabil po volbách</td></tr>
+      <tr><td style="padding:0.15rem 1rem 0.15rem 0">2023</td><td style="text-align:right;padding:0.15rem 1rem">0,0629</td><td style="text-align:right;padding:0.15rem 1rem">~381</td><td></td></tr>
+      <tr><td style="padding:0.15rem 1rem 0.15rem 0">2024</td><td style="text-align:right;padding:0.15rem 1rem">0,0636</td><td style="text-align:right;padding:0.15rem 1rem">~395</td><td></td></tr>
+      <tr style="color:var(--accent);font-weight:500"><td style="padding:0.15rem 1rem 0.15rem 0">2025</td><td style="text-align:right;padding:0.15rem 1rem">0,0622</td><td style="text-align:right;padding:0.15rem 1rem">~397</td><td>Průměr dle exchange-rates.org</td></tr>
+    </table>
+    <div style="color:var(--muted);margin-top:0.6rem">Zdroj: exchange-rates.org (data ECB/ČNB). HUF/CZK = EUR/CZK ÷ EUR/HUF. Přepočty jsou orientační. Forint oslabil vůči Kč od 2010 o ~35 %.</div>
+  </div>
+
+  </div>
+</div>
+
+<script>
+function showTab(id, evt) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (evt && evt.target) evt.target.classList.add('active');
+}
+
+function filterTable(sector, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#rankTable tbody tr').forEach(row => {
+    row.style.display = (sector === 'all' || row.dataset.sector === sector) ? '' : 'none';
+  });
+}
+</script>
+
+<script>
+  (function() {
+    var btn = document.getElementById('theme-toggle');
+    var saved = localStorage.getItem('theme') || 'light';
+    document.body.setAttribute('data-theme', saved);
+    btn.addEventListener('click', function() {
+      var current = document.body.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      document.body.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
+  })();
+</script>
+</body>
+</html>
